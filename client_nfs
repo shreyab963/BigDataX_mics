@@ -1,0 +1,127 @@
+#include <stdio.h>	//printf
+#include <string.h>	//strlen
+#include <sys/socket.h>	//socket
+#include <arpa/inet.h>	//inet_addr
+#include <unistd.h>
+#include <ifaddrs.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+
+#define SPACE "\t"
+
+// Returns hostname for the local computer
+void checkHostName(int hostname)
+{
+    if (hostname == -1)
+    {
+        perror("gethostname");
+        exit(1);
+    }
+}
+  
+// Returns host information corresponding to host name
+void checkHostEntry(struct hostent * hostentry)
+{
+    if (hostentry == NULL)
+    {
+        perror("gethostbyname");
+        exit(1);
+    }
+}
+  
+// Converts space-delimited IPv4 addresses
+// to dotted-decimal format
+void checkIPbuffer(char *IPbuffer)
+{
+    if (NULL == IPbuffer)
+    {
+        perror("inet_ntoa");
+        exit(1);
+    }
+}
+
+
+int main(int argc , char *argv[])
+{
+	FILE *fp;
+	int sock;
+	int worker_num = 1;
+	struct sockaddr_in server;
+	char *path , query[2000], *message;
+	
+	char hostbuffer[1000];
+    char *IPbuffer;
+    struct hostent *host_entry;
+    int hostname;
+    int filefound;
+  
+    //retrieve hostname
+    hostname = gethostname(hostbuffer, sizeof(hostbuffer));
+    checkHostName(hostname);
+  
+    // retrieve host information
+    host_entry = gethostbyname(hostbuffer);
+    checkHostEntry(host_entry);
+  
+    // convert an Internet network address into ASCII string
+    IPbuffer = inet_ntoa(*((struct in_addr*)
+                           host_entry->h_addr_list[0]));
+
+	//Create socket
+	sock = socket(AF_INET , SOCK_STREAM , 0);
+	if (sock == -1)
+	{
+		printf("Could not create socket");
+	}
+	puts("Socket created");
+	
+	server.sin_addr.s_addr = inet_addr("172.20.3.153");
+	server.sin_family = AF_INET;
+	server.sin_port = htons( 9005 );
+
+	//Connect to remote server
+	if (connect(sock , (struct sockaddr *)&server , sizeof(server)) < 0)
+	{
+		perror("connect failed. Error");
+		return 1;
+	}
+	
+	puts("Connected\n");
+	
+    if( recv(sock , query , 2000 , 0) < 0)
+	{
+			puts("recv failed");
+			
+	}
+	puts(query);
+	if( send(sock , hostbuffer  , strlen(hostbuffer) , 0) < 0)
+	{
+		puts("Send failed");
+		return 1;
+	}
+    
+    strcat(hostbuffer, SPACE);
+	strcat(hostbuffer, IPbuffer);
+	 
+	while(1)
+	{
+		filefound =1; //dummy bool, assuming file is found
+		path = "This is the file path\n";
+		if(filefound == 1)//file  found
+		{
+			fp = fopen("/exports/stor/data/data.txt","w");
+			fprintf(fp, "%s", path);
+			fclose(fp);
+			   
+	    message = "File found";		   
+	    send(sock , hostbuffer  , strlen(hostbuffer) , 0);    
+	    return 0;    
+		}	
+	}
+	
+	close(sock);
+	return 0;
+}
