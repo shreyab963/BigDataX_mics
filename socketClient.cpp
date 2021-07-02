@@ -11,17 +11,23 @@
 #include <pthread.h>
 #include <iostream>
 #include <vector>
+#include <pthread.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
-#define SIZE 1000
 
+#define SIZE 1024
+
+pthread_mutex_t mutexBuffer;
 
 using namespace google::protobuf::io;
 
 using namespace std;
 
+char message[SIZE];
 
+void* sendMessage(void*);
+void* receiveMessage(void*);
 
 int main(int argv, char** argc){
 
@@ -35,10 +41,14 @@ int main(int argv, char** argc){
         int bytecount;
         int buffer_len=0;
 
+        pthread_mutex_init(&mutexBuffer, NULL);
+
         int hsock;
         int * p_int;
         int err;
 
+        pthread_t send ;
+        pthread_t receive;
         hsock = socket(AF_INET, SOCK_STREAM, 0);
         if(hsock == -1){
                 printf("Error initializing socket %d\n",errno);
@@ -67,14 +77,57 @@ int main(int argv, char** argc){
                         goto FINISH;
                 }
         }
-        
-        while( (bytecount = recv(hsock , server_message , SIZE, 0)) > 0 )
-        {
-            if ((bytecount = send(*csock, server_message, SIZE, 0)) == -1) {
-                cerr << "Error sending data " << endl;
-            }
+
+        else {
+            pthread_create(&send, 0, &sendMessage, (void *) &hsock);
+            pthread_create(&receive, 0, &receiveMessage, (void *) &hsock);
+            pthread_join(receive, NULL);
+            pthread_join(send, NULL);
         }
 
 FINISH:
+       pthread_mutex_destroy(&mutexBuffer);
         close(hsock);
 }
+
+void* sendMessage(void* lp){
+    int *csock = (int*)lp;
+    int bytecount=0;
+
+    cout << "\n\n" << endl;
+    while(true) {
+        if(strlen(message) != '\0') {
+            pthread_mutex_lock(&mutexBuffer);
+
+            if ((bytecount = send(*csock, message, SIZE, 0)) == -1) {
+                cerr << "Error sending data " << endl;
+            }
+            memset(message, 0, sizeof(message));
+            pthread_mutex_unlock(&mutexBuffer);
+        }
+    }
+
+}
+
+void* receiveMessage(void* lp){
+    int *csock = (int*)lp;
+    int bytecount=0;
+    char buffer[4];
+
+    while(true){
+          if(strlen(message) == '\0') {
+              pthread_mutex_lock(&mutexBuffer);
+
+              if ((bytecount = recv(*csock, message, SIZE, 0)) == -1) {
+                  cerr << "Error receiving data " << endl;
+              }
+              else{
+                  cout << message << endl;
+              }
+              pthread_mutex_unlock(&mutexBuffer);
+
+          }
+
+    }
+}
+
