@@ -51,12 +51,13 @@ int main(int argv, char** argc){
         socklen_t addr_size = 0;
         int* csock;
         sockaddr_in sadr;
-        pthread_mutex_init(&mutexBuffer, NULL);
+
 
         pthread_t thread_id=0;
 
         pthread_t send =0;
         pthread_t receive=0;
+        //pthread_mutex_init(&mutexBuffer, NULL);
 
         hsock = socket(AF_INET, SOCK_STREAM, 0);
         if(hsock == -1){
@@ -100,10 +101,13 @@ int main(int argv, char** argc){
                 if((*csock = accept( hsock, (sockaddr*)&sadr, &addr_size))!= -1){
                         printf("---------------------\nReceived connection from %s\n",inet_ntoa(sadr.sin_addr));
                         ip_addr.push_back(inet_ntoa(sadr.sin_addr));
-                        pthread_create(&send,0,&sendMessage, (void*)csock );
-                        pthread_create(&receive,0,&receiveMessage, (void*)csock );
-                        pthread_detach(send);
-                        pthread_detach(receive);
+
+                       // pthread_create(&send,0,&sendMessage, (void*)csock );
+                       // pthread_create(&receive,0,&receiveMessage, (void*)csock );
+                        pthread_create(&thread_id,0,&SocketHandler, (void*)csock );
+                        pthread_detach(thread_id);
+                       // pthread_detach(send);
+                     //  pthread_detach(receive);
                 }
                 else{
                         fprintf(stderr, "Error accepting %d\n", errno);
@@ -112,17 +116,17 @@ int main(int argv, char** argc){
 
 FINISH:
     pthread_mutex_destroy(&mutexBuffer);
+
 ;
 }
 
-/*void* SocketHandler(void* lp){
+void* SocketHandler(void* lp){
     int *csock = (int*)lp;
 
         pthread_t send;
         pthread_t receive;
         pthread_mutex_init(&mutexBuffer, NULL);
-        //sem_init(&semEmpty,0,NUM_WORKERS);
-       // sem_init(&semFull,0,0);
+
 
         pthread_create(&send,0,&sendMessage, (void*)csock );
 
@@ -131,13 +135,11 @@ FINISH:
         pthread_join(send, NULL);
         pthread_join(receive, NULL);
 
-        //sem_destroy(&semEmpty);
-        //sem_destroy(&semFull);
         pthread_mutex_destroy(&mutexBuffer);
         free(csock);
     return 0;
 }
-*/
+
 void* sendMessage(void* lp){
     int *csock = (int*)lp;
     int bytecount=0;
@@ -150,26 +152,16 @@ void* sendMessage(void* lp){
         if(strlen(message) == '\0') {
             pthread_mutex_lock(&mutexBuffer);
             cin.getline(message, SIZE);
-            //sem_wait(&semEmpty);
 
             if ((bytecount = send(*csock, message, SIZE, 0)) == -1) {
                 cerr << "Error sending data " << endl;
             }
-            memset(message, 0, sizeof(message));
             pthread_mutex_unlock(&mutexBuffer);
         }
-        else {
-            cout << message << endl;
-            if ((bytecount = send(*csock, message, SIZE, 0)) == -1) {
-                cerr << "Error sending data " << endl;
-           }
-        }
 
-        //sem_post(&semFull);
     }
 
 }
-
 void* receiveMessage(void* lp){
     char client_message[SIZE] = {0};
     int *csock = (int*)lp;
@@ -178,15 +170,14 @@ void* receiveMessage(void* lp){
 
     while(true){
         if(strlen(message) != '\0') {
-            //sem_wait(&semFull);
             pthread_mutex_lock(&mutexBuffer);
 
             if ((bytecount = recv(*csock, client_message, SIZE, 0)) == -1) {
                 cerr << "Error receiving data " << endl;
             }
             cout << "it's the client message: " << client_message << endl;
+            memset(message, 0, sizeof(message));
             pthread_mutex_unlock(&mutexBuffer);
-            //sem_post(&semEmpty);
         }
     }
 }
