@@ -105,7 +105,7 @@ void queue_remove(int uid){
 
 int main(int argv, char** argc){
 
-        int host_port= 9016;
+        int host_port= 9015;
         struct sockaddr_in my_addr;
 
         int hsock;
@@ -171,8 +171,8 @@ int main(int argv, char** argc){
                         queue_add(worker);
                         pthread_create(&thread_id, NULL, &SocketHandler, (void*)worker);
 
-                         /* Reduce CPU usage */
-                         sleep(1);
+                        /* Reduce CPU usage */
+                        sleep(1);
                 }
                 else{
                         fprintf(stderr, "Error accepting %d\n", errno);
@@ -199,12 +199,12 @@ void* SocketHandler(void* lp){
         strcpy(worker->name, worker_name);
         cout << worker->name << "connected" <<endl;
     }*/
-    cout <<"here1"<<endl;
 
     bzero(worker_message, SIZE);
     while(1){
         if (leave_flag) {
-            break;
+            cout << "Shutting down" <<endl;
+            return 0;
         }
         sendMessage();
         if(strlen(message) != '\0') {
@@ -236,25 +236,20 @@ void* SocketHandler(void* lp){
 void sendMessage(){
     pthread_mutex_lock(&workers_mutex);
 
-    str_overwrite_stdout();
+    //str_overwrite_stdout();
 
     if(strlen(message) == '\0') {
         cin.getline(message, SIZE);
         for (int i = 0; i < MAX_WORKERS; ++i) {
             if (workers[i]) {
-                cout << "here" << endl;
                 if (send(workers[i]->sockfd, message, strlen(message),0) < 0) {
                     cout << "Error sending message" << endl;
                     break;
                 }
-                else
-                {
-                    cout <<"sent" <<endl;
-                }
             }
         }
     }
-    pthread_mutex_unlock(&workers_mutex);
+   pthread_mutex_unlock(&workers_mutex);
 }
 
 void catch_ctrl_c_and_exit(int sig) {
