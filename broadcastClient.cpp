@@ -26,15 +26,13 @@ using namespace std;
 
 volatile sig_atomic_t flag = 0;
 char message[SIZE];
-char name[32];
 
 void* sendMessage(void*);
 void* receiveMessage(void*);
 
-
 int main(int argv, char** argc){
 
-    int host_port= 9016;
+    int host_port= 9015;
     char host_name[]="172.20.3.153";
 
     struct sockaddr_in my_addr;
@@ -63,7 +61,7 @@ int main(int argv, char** argc){
 
     if( (setsockopt(hsock, SOL_SOCKET, SO_REUSEADDR, (char*)p_int, sizeof(int)) == -1 )||
         (setsockopt(hsock, SOL_SOCKET, SO_KEEPALIVE, (char*)p_int, sizeof(int)) == -1 ) ){
-        cout << "Error setting options" << endl;
+        printf("Error setting options %d\n",errno);
         free(p_int);
         goto FINISH;
     }
@@ -76,10 +74,11 @@ int main(int argv, char** argc){
     my_addr.sin_addr.s_addr = inet_addr(host_name);
     if( connect( hsock, (struct sockaddr*)&my_addr, sizeof(my_addr)) == -1 ){
         if((err = errno) != EINPROGRESS){
-            cout << "Error connecting socket" << endl;
+            fprintf(stderr, "Error connecting socket %d\n", errno);
             goto FINISH;
         }
     }
+
     pthread_t recv_msg;
     if(pthread_create(&recv_msg, NULL, receiveMessage, (void*)&hsock) != 0){
         cout << "Error creating thread" << endl;
@@ -93,13 +92,14 @@ int main(int argv, char** argc){
 
     while (1){
         if(flag){
-            printf("\nDisconnected\n");
-            break;
+            printf("\nWorker Disconnected\n");
+            return 0;
         }
     }
-
     FINISH:
     close(hsock);
+    return EXIT_SUCCESS;
+
 
 }
 
@@ -119,6 +119,7 @@ void* sendMessage(void* lp){
             pthread_mutex_unlock(&mutexBuffer);
         }
     }
+
 }
 
 void* receiveMessage(void* lp){
@@ -128,15 +129,20 @@ void* receiveMessage(void* lp){
 
     while(true){
         if(strlen(message) == '\0') {
+            pthread_mutex_lock(&mutexBuffer);
 
             if ((bytecount = recv(*csock, message, SIZE, 0)) == -1) {
                 cerr << "Error receiving data " << endl;
             }
-            else if(bytecount > 0){
-                cout << message << endl;
+            else if(bytecount==0 || strcmp(message, "exit") == 0){
+                flag =1;
             }
             else{
+                cout << message << endl;
             }
+            pthread_mutex_unlock(&mutexBuffer);
+
         }
+
     }
 }
